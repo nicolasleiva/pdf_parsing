@@ -28,6 +28,43 @@ const upload = multer({
   },
 });
 
+/**
+ * Elimina líneas repetidas que suelen corresponder a encabezados o pies de página.
+ * Se eliminan duplicados consecutivos y líneas que se repiten más de dos veces
+ * si son relativamente cortas (menos de 80 caracteres).
+ *
+ * @param {string} text - Texto a procesar.
+ * @returns {string} Texto con líneas repetidas eliminadas.
+ */
+function removeRepeatedLines(text) {
+  // Dividir el texto en líneas, eliminando espacios extremos y líneas vacías.
+  const originalLines = text.split('\n').map(line => line.trim()).filter(line => line !== '');
+  
+  // Eliminar duplicados consecutivos
+  const dedupedLines = [];
+  for (const line of originalLines) {
+    if (dedupedLines.length === 0 || dedupedLines[dedupedLines.length - 1] !== line) {
+      dedupedLines.push(line);
+    }
+  }
+  
+  // Contar la frecuencia de cada línea en el texto original
+  const frequency = {};
+  for (const line of originalLines) {
+    frequency[line] = (frequency[line] || 0) + 1;
+  }
+  
+  // Filtrar líneas que se repiten demasiado y son cortas (probables encabezados o pies de página)
+  const filteredLines = dedupedLines.filter(line => {
+    if (frequency[line] > 2 && line.length < 80) {
+      return false;
+    }
+    return true;
+  });
+  
+  return filteredLines.join('\n');
+}
+
 // Función para extraer y formatear el texto del PDF
 async function extractTextFromPDF(pdfBuffer) {
   try {
@@ -40,15 +77,13 @@ async function extractTextFromPDF(pdfBuffer) {
       const page = await pdf.getPage(pageNum);
       const content = await page.getTextContent();
 
-      // Se unen los fragmentos de texto obtenidos de cada página
+      // Unir los fragmentos de texto obtenidos de cada página
       const pageText = content.items.map(item => item.str).join(' ');
       fullText += pageText + '\n\n';
     }
 
-    // Paso 1: Eliminar líneas vacías de más y recortar espacios
-    let cleanedText = fullText
-      .replace(/\n\s*\n/g, '\n\n')
-      .trim();
+    // Paso 1: Eliminar líneas vacías en exceso y recortar espacios
+    let cleanedText = fullText.replace(/\n\s*\n/g, '\n\n').trim();
 
     // Paso 2: Unir secuencias de letras individuales separadas por espacios
     // Ejemplo: "H I S T O R I A S" se convertirá en "HISTORIAS"
@@ -57,8 +92,11 @@ async function extractTextFromPDF(pdfBuffer) {
       match => match.replace(/\s+/g, '')
     );
 
-    // Paso 3 (opcional): Normalizar espacios múltiples en uno solo
+    // Paso 3: Normalizar espacios múltiples en uno solo
     cleanedText = cleanedText.replace(/\s{2,}/g, ' ');
+
+    // Paso 4: Eliminar líneas repetidas (encabezados, pies, etc.)
+    cleanedText = removeRepeatedLines(cleanedText);
 
     return cleanedText;
   } catch (error) {
