@@ -95,7 +95,13 @@ async function extractTextFromPDF(pdfBuffer) {
     // Paso 3: Normalizar espacios múltiples en uno solo
     cleanedText = cleanedText.replace(/\s{2,}/g, ' ');
 
-    // Paso 4: Eliminar líneas repetidas (encabezados, pies, etc.)
+    // Paso 4: Corregir errores de guionación (palabras fragmentadas)
+    // Remover guiones al final de línea seguidos de salto de línea (unir palabra partida)
+    cleanedText = cleanedText.replace(/-\s*\n\s*/g, '');
+    // Unir palabras separadas con guion y espacios (ej.: "verifica - ción" a "verificación")
+    cleanedText = cleanedText.replace(/(\w)-\s+(\w)/g, '$1$2');
+
+    // Paso 5: Eliminar líneas repetidas (encabezados, pies, etc.)
     cleanedText = removeRepeatedLines(cleanedText);
 
     return cleanedText;
